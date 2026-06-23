@@ -1,7 +1,16 @@
 import mongoose, { Schema } from "mongoose";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import { DB_NAME } from "../constants.js";
 
 const userSchema = new Schema(
     {
+        userName: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+
         fullName: {
             type: String,
             required: true,
@@ -17,11 +26,6 @@ const userSchema = new Schema(
             index: true,
         },
 
-        bio: {
-            type: String,
-            default: "",
-            maxlength: 500,
-        },
 
         phone: {
             type: String,
@@ -37,15 +41,37 @@ const userSchema = new Schema(
             minlength: 6,
         },
 
+        class: {
+            type: String,
+            default: ""
+        },
+        institutionName : {
+            type: String,
+            default: ""
+        },
+
+        location : {
+            type: String,
+            default: ""
+        },
+
+        bio: {
+            type: String,
+            default: "",
+            maxlength: 500,
+        },
+
         avatar: {
             type: String,
             default: "",
         },
+
         status: {
             type: String,
             enum: ["active", "inactive", "suspended"],
             default: "active"
-         },
+        },
+
         role: {
             type: String,
             enum: ["owner", "admin", "teacher", "student"],
@@ -73,11 +99,11 @@ const userSchema = new Schema(
                 ref: "Course",
             },
         ],
-        
+
         isVerified: {
             type: Boolean,
             default: false
-         },
+        },
 
         socialLinks: {
             facebook: {
@@ -116,15 +142,43 @@ const userSchema = new Schema(
 );
 
 
-userSchema.pre("save", async function (next) {
-    if (!this.isModified("password")) return next();
-  
+userSchema.pre("save", async function () {
+    if (!this.isModified("password")) return;
+
     this.password = await bcrypt.hash(this.password, 10);
-    next();
-  });
-  
+});
+
 userSchema.methods.isPasswordCorrect = async function (password) {
     return await bcrypt.compare(password, this.password);
-  };
+};
+
+
+userSchema.methods.generateAccessToken = function () {
+    return jwt.sign(
+        {
+            _id: this._id,
+            email: this.email,
+            username: this.username,
+            fullName: this.fullName,
+        },
+        process.env.ACCESS_TOKEN_SECRET,
+        {
+            expiresIn: process.env.ACCESS_TOKEN_EXPIRY,
+        }
+    );
+};
+userSchema.methods.generateRefreshToken = function () {
+    return jwt.sign(
+        {
+            _id: this._id,
+        },
+        process.env.REFRESH_TOKEN_SECRET,
+        {
+            expiresIn: process.env.REFRESH_TOKEN_EXPIRY,
+        }
+    );
+};
+
+
 
 export const User = mongoose.model("User", userSchema);

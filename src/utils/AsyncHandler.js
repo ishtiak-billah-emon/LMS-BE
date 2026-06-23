@@ -1,9 +1,9 @@
-const AsynHandler = (requsetHandler) => {
+const AsyncHandler = (requsetHandler) => {
 
-    (req, res, next) => {
+    return (req, res, next) => {
       Promise.resolve(requsetHandler(req, res, next)).catch((err)=>next(err))
     }
   }
   
   
-  export { AsynHandler };
+  export { AsyncHandler };
