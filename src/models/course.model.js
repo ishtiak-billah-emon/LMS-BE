@@ -1,5 +1,25 @@
 import mongoose, { Schema } from "mongoose";
 
+
+const resourceSchema = new Schema(
+  {
+      title: {
+          type: String,
+          required: true,
+          trim: true,
+      },
+
+      fileUrl: {
+          type: String,
+          required: true,
+          trim: true,
+      },
+  },
+  {
+      _id: true,
+  }
+);
+
 const lessonSchema = new Schema(
   {
     title: {
@@ -11,6 +31,7 @@ const lessonSchema = new Schema(
     videoUrl: {
       type: String,
       required: true,
+      trim: true,
     },
 
     duration: {
@@ -27,6 +48,8 @@ const lessonSchema = new Schema(
       type: Number,
       required: true,
     },
+
+    resources: [resourceSchema]
   },
   {
     _id: true,
@@ -73,11 +96,13 @@ const courseSchema = new Schema(
     description: {
       type: String,
       required: true,
+      trim: true,
     },
 
     thumbnail: {
       type: String,
       required: true,
+      trim: true,
     },
 
     teacher: {
@@ -94,11 +119,6 @@ const courseSchema = new Schema(
       index: true,
     },
 
-    language: {
-      type: String,
-      default: "Bangla",
-    },
-
     price: {
       type: Number,
       required: true,
@@ -109,6 +129,12 @@ const courseSchema = new Schema(
       type: Number,
       default: 0,
       min: 0,
+      validate: {
+        validator(value) {
+          return value <= this.price;
+        },
+        message: "Discount price cannot exceed original price."
+      }
     },
 
     totalDuration: {
@@ -150,5 +176,10 @@ const courseSchema = new Schema(
     timestamps: true,
   }
 );
+
+courseSchema.index({
+  status: 1,
+  category: 1,
+});
 
 export const Course = mongoose.model("Course", courseSchema);

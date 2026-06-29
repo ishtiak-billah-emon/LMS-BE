@@ -90,4 +90,131 @@ const loginUserService = async ({
     return { accessToken, refreshToken, loggedInUser: userObject }
 
 };
-export { registerUserService, loginUserService };
+
+const updateProfileService = async (currentUser, updateData) => {
+    const {
+        _id,
+        email: currentEmail,
+        phone: currentPhone,
+        socialLinks: currentSocialLinks,
+    } = currentUser;
+
+    const {
+        userName,
+        fullName,
+        email,
+        phone,
+        class: studentClass,
+        institutionName,
+        location,
+        bio,
+        socialLinks,
+    } = updateData;
+
+    // -------------------------------
+    // Check uniqueness (only if changed)
+    // -------------------------------
+
+    const emailQuery =
+        email && email.trim().toLowerCase() !== currentEmail
+            ? User.findOne({
+                  email: email.trim().toLowerCase(),
+                  _id: { $ne: _id },
+              })
+            : Promise.resolve(null);
+
+    const phoneQuery =
+        phone && phone.trim() !== currentPhone
+            ? User.findOne({
+                  phone: phone.trim(),
+                  _id: { $ne: _id },
+              })
+            : Promise.resolve(null);
+
+    const [existingEmail, existingPhone] = await Promise.all([
+        emailQuery,
+        phoneQuery,
+    ]);
+
+    if (existingEmail) {
+        throw new ApiError(409, "Email already exists");
+    }
+
+    if (existingPhone) {
+        throw new ApiError(409, "Phone number already exists");
+    }
+
+    // -------------------------------
+    // Build update object
+    // -------------------------------
+
+    const updateFields = {};
+
+    const fields = {
+        userName,
+        fullName,
+        email,
+        phone,
+        class: studentClass,
+        institutionName,
+        location,
+        bio,
+    };
+
+    Object.entries(fields).forEach(([key, value]) => {
+        if (value !== undefined) {
+            updateFields[key] =
+                typeof value === "string"
+                    ? key === "email"
+                        ? value.trim().toLowerCase()
+                        : value.trim()
+                    : value;
+        }
+    });
+
+    // -------------------------------
+    // Merge Social Links
+    // -------------------------------
+
+    if (socialLinks && typeof socialLinks === "object") {
+        const trimmedSocialLinks = {};
+
+        Object.entries(socialLinks).forEach(([key, value]) => {
+            trimmedSocialLinks[key] =
+                typeof value === "string" ? value.trim() : value;
+        });
+
+        updateFields.socialLinks = {
+            ...currentSocialLinks,
+            ...trimmedSocialLinks,
+        };
+    }
+
+    // -------------------------------
+    // Nothing to update
+    // -------------------------------
+
+    if (Object.keys(updateFields).length === 0) {
+        throw new ApiError(400, "No valid fields provided to update");
+    }
+
+    // -------------------------------
+    // Update User
+    // -------------------------------
+
+    const updatedUser = await User.findByIdAndUpdate(
+        _id,
+        {
+            $set: updateFields,
+        },
+        {
+            new: true,
+            runValidators: true,
+        }
+    ).select("-password -refreshToken");
+
+    return updatedUser;
+};
+
+
+export { registerUserService, loginUserService, updateProfileService };

@@ -15,10 +15,24 @@ const paymentSchema = new Schema(
       required: true,
       index: true,
     },
-
-    amount: {
+    coursePrice: {
       type: Number,
       required: true,
+    },
+
+    totalAmount: {
+      type: Number,
+      required: true,
+    },
+    currency: {
+      type: String,
+      enum: [
+        "BDT",
+        "USD",
+        "EUR",
+        "GBP",
+      ],
+      default: "BDT",
     },
 
     paymentMethod: {
@@ -27,6 +41,7 @@ const paymentSchema = new Schema(
         "sslcommerz",
         "bkash_sendmoney",
         "nagad_sendmoney",
+        "free",
       ],
       required: true,
     },
@@ -34,6 +49,19 @@ const paymentSchema = new Schema(
     transactionId: {
       type: String,
       trim: true,
+      unique: true,
+      sparse: true,
+      default: null,
+    },
+    // Store the complete response from SSLCommerz (optional but recommended)
+    gatewayResponse: {
+      type: Schema.Types.Mixed,
+      default: null,
+    },
+
+    failureReason: {
+      type: String,
+      default: "",
     },
 
     status: {
@@ -46,6 +74,7 @@ const paymentSchema = new Schema(
         "refunded",
       ],
       default: "pending",
+      index: true,
     },
 
     paidAt: Date,
@@ -60,6 +89,15 @@ const paymentSchema = new Schema(
   }
 );
 
+paymentSchema.index({
+  student: 1,
+  status: 1,
+});
+
+paymentSchema.index({
+  course: 1,
+  status: 1,
+});
 export const Payment = mongoose.model(
   "Payment",
   paymentSchema

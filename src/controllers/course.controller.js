@@ -1,7 +1,23 @@
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { AsyncHandler } from "../utils/AsyncHandler.js";
-import { createCourseService, createLessonService, createSectionService, getCourseByIdService, getCourseService, updateCourseService } from "../services/course.service.js"
+import {
+    createCourseService,
+    createLessonService,
+    createSectionService,
+    getCourseByIdService,
+    getCoursesByTeacherService,
+    getCourseService,
+    getPublishedCourseService,
+    changeCourseStatusService,
+    updateCourseService,
+    deleteCourseService,
+    deleteLessonService,
+    updateLessonService,
+    getLessonService,
+    deleteSectionService,
+    updateSectionService
+} from "../services/course.service.js"
 
 const createCourse = AsyncHandler(async (req, res) => {
 
@@ -80,21 +96,22 @@ const updateCourse = AsyncHandler(async (req, res) => {
     );
 });
 
-const getCourse = AsyncHandler(async(req, res)=> {
+const getCourse = AsyncHandler(async (req, res) => {
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 12;
     const courses = await getCourseService(page, limit);
     return res
-    .status(200)
-    .json(
-        new ApiResponse(
-            200,
-            courses,
-            "Get courses successfully"
-        )
-    );
-    
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                courses,
+                "Get courses successfully"
+            )
+        );
+
 })
+
 const getCourseById = AsyncHandler(async (req, res) => {
     const { courseId } = req.params;
     const course = await getCourseByIdService(courseId);
@@ -108,6 +125,120 @@ const getCourseById = AsyncHandler(async (req, res) => {
             )
         );
 })
+
+const getMyCourses = AsyncHandler(async (req, res) => {
+
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 12;
+
+    const result =
+        await getCoursesByTeacherService(
+            req.user._id,
+            page,
+            limit,
+        );
+
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            result,
+            "Courses fetched successfully."
+        )
+    );
+});
+
+const getCoursesByTeacher = AsyncHandler(async (req, res) => {
+
+    const { teacherId } = req.params;
+
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 12;
+
+    const result =
+        await getCoursesByTeacherService(
+            teacherId,
+            page,
+            limit
+        );
+
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            result,
+            "Courses fetched successfully."
+        )
+    );
+});
+
+const getPublishedCourse = AsyncHandler(async (req, res) => {
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 12;
+    const courses = await getPublishedCourseService(page, limit)
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                courses,
+                "Get published courses successfully"
+            )
+        );
+})
+
+const getPublishedCourseById = AsyncHandler(async (req, res) => {
+    const {courseId} = req.params;
+    const courses = await getPublishedCourseByIdService(courseId)
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                courses,
+                "Get published courses successfully By Id"
+            )
+        );
+})
+
+const changeCourseStatus = AsyncHandler(async (req, res) => {
+
+    const { courseId } = req.params;
+    const { status } = req.body;
+
+    if (!status) {
+        throw new ApiError(400, "Status is required.");
+    }
+
+    const course = await changeCourseStatusService(
+        req.user,
+        courseId,
+        status
+    );
+
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            course,
+            `Course ${status} successfully.`
+        )
+    );
+});
+
+const deleteCourse = AsyncHandler(async (req, res) => {
+    const { courseId } = req.params;
+
+    await deleteCourseService(
+        req.user,
+        courseId
+    );
+
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            null,
+            "Course deleted successfully."
+        )
+    );
+});
 
 const createSection = AsyncHandler(async (req, res) => {
     const { courseId } = req.params;
@@ -131,6 +262,51 @@ const createSection = AsyncHandler(async (req, res) => {
         )
     );
 })
+const updateSection = AsyncHandler(async (req, res) => {
+
+    const { courseId, sectionId } = req.params;
+    const { title } = req.body;
+
+    if (!title || title.trim() === "") {
+        throw new ApiError(
+            400,
+            "Section title is required."
+        );
+    }
+
+    const section = await updateSectionService(
+        req.user,
+        courseId,
+        sectionId,
+        title
+    );
+
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            section,
+            "Section updated successfully."
+        )
+    );
+});
+const deleteSection = AsyncHandler(async (req, res) => {
+
+    const { courseId, sectionId } = req.params;
+
+    await deleteSectionService(
+        req.user,
+        courseId,
+        sectionId
+    );
+
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            null,
+            "Section deleted successfully."
+        )
+    );
+});
 
 const createLesson = AsyncHandler(async (req, res) => {
     const { courseId, sectionId } = req.params;
@@ -195,11 +371,98 @@ const createLesson = AsyncHandler(async (req, res) => {
     );
 })
 
+const getLesson = AsyncHandler(async (req, res) => {
+
+    const { courseId, sectionId, lessonId } = req.params;
+
+    const lesson = await getLessonService(
+        req.user,
+        courseId,
+        sectionId,
+        lessonId
+    );
+
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            lesson,
+            "Lesson fetched successfully."
+        )
+    );
+});
+
+const updateLesson = AsyncHandler(async (req, res) => {
+
+    const { courseId, sectionId, lessonId } = req.params;
+
+    const {
+        title,
+        videoUrl,
+        duration,
+        preview,
+    } = req.body;
+
+    const lesson = await updateLessonService(
+        req.user,
+        courseId,
+        sectionId,
+        lessonId,
+        {
+            title,
+            videoUrl,
+            duration,
+            preview,
+        }
+    );
+
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            lesson,
+            "Lesson updated successfully."
+        )
+    );
+});
+
+const deleteLesson = AsyncHandler(async (req, res) => {
+
+    const {
+        courseId,
+        sectionId,
+        lessonId,
+    } = req.params;
+
+    await deleteLessonService(
+        req.user,
+        courseId,
+        sectionId,
+        lessonId
+    );
+
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            null,
+            "Lesson deleted successfully."
+        )
+    );
+});
 export {
     getCourse,
     getCourseById,
+    getMyCourses,
+    getCoursesByTeacher,
+    getPublishedCourse,
+    getPublishedCourseById,
     createCourse,
     updateCourse,
+    deleteCourse,
+    changeCourseStatus,
     createSection,
-    createLesson
+    updateSection,
+    deleteSection,
+    getLesson,
+    createLesson,
+    updateLesson,
+    deleteLesson
 }

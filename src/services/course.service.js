@@ -1,7 +1,7 @@
 import slugify from "slugify";
 import { Course } from "../models/course.model.js";
 import { ApiError } from "../utils/ApiError.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js";
 import { findOwnedCourse } from "../utils/course.helper.js";
 import { findSection } from "../utils/section.helper.js";
 import mongoose from "mongoose";
@@ -88,6 +88,36 @@ const createCourseService = async (
 
 };
 
+const getPublishedCourseService = async (page = 1, limit = 12) => {
+
+    const skip = (page - 1) * limit;
+
+    const [courses, totalCourses] = await Promise.all([
+        Course.find({
+            status: "published"
+        })
+            .select(
+                "title slug thumbnail teacher category price discountPrice averageRating totalStudents"
+            )
+            .populate("teacher", "fullName avatar")
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit),
+
+        Course.countDocuments({status: "published"})
+    ]);
+
+    return {
+        courses,
+        pagination: {
+            page,
+            limit,
+            totalCourses,
+            totalPages: Math.ceil(totalCourses / limit),
+        },
+    };
+};
+
 const getCourseService = async (page = 1, limit = 12) => {
 
     const skip = (page - 1) * limit;
@@ -116,7 +146,7 @@ const getCourseService = async (page = 1, limit = 12) => {
     };
 };
 
-const getCourseByIdService = async (courseId) => {
+const getPublishedCourseByIdService = async (courseId) => {
 
     const course = await Course.findOne({
         _id: courseId,
@@ -130,6 +160,58 @@ const getCourseByIdService = async (courseId) => {
     }
 
     return course;
+};
+
+const getCourseByIdService = async (courseId) => {
+
+    const course = await Course.findOne({
+        _id: courseId,
+    })
+        .populate("teacher", "fullName avatar bio")
+        .lean();
+
+    if (!course) {
+        throw new ApiError(404, "Course not found");
+    }
+
+    return course;
+};
+
+const getCoursesByTeacherService = async (
+    teacherId,
+    page = 1,
+    limit = 12
+) => {
+
+    const skip = (page - 1) * limit;
+
+    const [courses, totalCourses] = await Promise.all([
+
+        Course.find({
+            teacher: teacherId
+        })
+        .select(
+            "title thumbnail category price discountPrice status createdAt"
+        )
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+
+        Course.countDocuments({
+            teacher: teacherId
+        })
+
+    ]);
+
+    return {
+        courses,
+        pagination: {
+            page,
+            limit,
+            totalCourses,
+            totalPages: Math.ceil(totalCourses / limit),
+        }
+    };
 };
 
 const updateCourseService = async (
@@ -279,10 +361,99 @@ const updateCourseService = async (
     return course;
 };
 
-// const publishCourseService = 
+const deleteCourseService = async (
+    currentUser,
+    courseId
+) => {
 
+    const course = await findOwnedCourse(
+        courseId,
+        currentUser
+    );
 
+    if (course.thumbnail) {
+        await deleteFromCloudinary(course.thumbnail);
+    }
+    await course.deleteOne();
 
+    return;
+};
+
+const changeCourseStatusService = async (
+    currentUser,
+    courseId,
+    status
+) => {
+
+    // Allow only valid statuses
+    const allowedStatuses = [
+        "draft",
+        "published",
+    ];
+
+    if (!allowedStatuses.includes(status)) {
+        throw new ApiError(
+            400,
+            "Invalid course status."
+        );
+    }
+
+    // Authorization
+    const course = await findOwnedCourse(
+        courseId,
+        currentUser
+    );
+
+    // Already in same status
+    if (course.status === status) {
+        throw new ApiError(
+            400,
+            `Course is already ${status}.`
+        );
+    }
+
+    // Optional validation before publishing
+    if (status === "published") {
+
+        if (!course.thumbnail) {
+            throw new ApiError(
+                400,
+                "Thumbnail is required before publishing."
+            );
+        }
+
+        if (!course.description) {
+            throw new ApiError(
+                400,
+                "Description is required before publishing."
+            );
+        }
+
+        if (course.sections.length === 0) {
+            throw new ApiError(
+                400,
+                "Add at least one section before publishing."
+            );
+        }
+
+        const hasLesson = course.sections.some(
+            section => section.lessons.length > 0
+        );
+
+        if (!hasLesson) {
+            throw new ApiError(
+                400,
+                "Add at least one lesson before publishing."
+            );
+        }
+    }
+
+    course.status = status;
+
+    await course.save();
+
+    return course;
+};
 
 const createSectionService = async (
     currentUser,
@@ -322,7 +493,80 @@ const createSectionService = async (
 
     return course;
 }
+const updateSectionService = async (
+    currentUser,
+    courseId,
+    sectionId,
+    title
+) => {
 
+    const course = await findOwnedCourse(
+        courseId,
+        currentUser
+    );
+
+    const section = findSection(
+        course,
+        sectionId
+    );
+
+    const normalizedTitle =
+        title.trim().toLowerCase();
+
+    const duplicateSection =
+        course.sections.some(
+            sec =>
+                sec._id.toString() !== sectionId &&
+                sec.title.trim().toLowerCase() === normalizedTitle
+        );
+
+    if (duplicateSection) {
+        throw new ApiError(
+            409,
+            "Section title already exists."
+        );
+    }
+
+    if (section.title === title.trim()) {
+        throw new ApiError(
+            400,
+            "No changes detected."
+        );
+    }
+
+    section.title = title.trim();
+
+    await course.save();
+
+    return section;
+};
+const deleteSectionService = async (
+    currentUser,
+    courseId,
+    sectionId
+) => {
+
+    const course = await findOwnedCourse(
+        courseId,
+        currentUser
+    );
+
+    const section = findSection(
+        course,
+        sectionId
+    );
+
+    section.deleteOne();
+
+    // Reorder remaining sections
+    course.sections.forEach(
+        (section, index) => {
+            section.order = index + 1;
+        }
+    );
+
+    await course.save();
+};
 const createLessonService = async (
     currentUser,
     courseId,
@@ -405,11 +649,174 @@ const createLessonService = async (
     return section.lessons.at(-1);
 };
 
+const getLessonService = async (
+    currentUser,
+    courseId,
+    sectionId,
+    lessonId
+) => {
+
+    const course = await findOwnedCourse(
+        courseId,
+        currentUser
+    );
+
+    const section = findSection(
+        course,
+        sectionId
+    );
+
+    const lesson = section.lessons.id(
+        lessonId
+    );
+
+    if (!lesson) {
+        throw new ApiError(
+            404,
+            "Lesson not found."
+        );
+    }
+
+    return lesson;
+};
+
+const updateLessonService = async (
+    currentUser,
+    courseId,
+    sectionId,
+    lessonId,
+    lessonData
+) => {
+
+    const course = await findOwnedCourse(
+        courseId,
+        currentUser
+    );
+
+    const section = findSection(
+        course,
+        sectionId
+    );
+
+    const lesson = section.lessons.id(
+        lessonId
+    );
+
+    if (!lesson) {
+        throw new ApiError(
+            404,
+            "Lesson not found."
+        );
+    }
+
+    let isUpdated = false;
+
+    if (
+        lessonData.title !== undefined &&
+        lessonData.title.trim() !== lesson.title
+    ) {
+        lesson.title = lessonData.title.trim();
+        isUpdated = true;
+    }
+
+    if (
+        lessonData.videoUrl !== undefined &&
+        lessonData.videoUrl.trim() !== lesson.videoUrl
+    ) {
+        lesson.videoUrl =
+            lessonData.videoUrl.trim();
+
+        isUpdated = true;
+    }
+
+    if (
+        lessonData.duration !== undefined &&
+        Number(lessonData.duration) !== lesson.duration
+    ) {
+        lesson.duration =
+            Number(lessonData.duration);
+
+        isUpdated = true;
+    }
+
+    if (
+        lessonData.preview !== undefined &&
+        lessonData.preview !== lesson.preview
+    ) {
+        lesson.preview =
+            lessonData.preview;
+
+        isUpdated = true;
+    }
+
+    if (!isUpdated) {
+        throw new ApiError(
+            400,
+            "No changes detected."
+        );
+    }
+
+    await course.save();
+
+    return lesson;
+};
+
+const deleteLessonService = async (
+    currentUser,
+    courseId,
+    sectionId,
+    lessonId
+) => {
+
+    const course = await findOwnedCourse(
+        courseId,
+        currentUser
+    );
+
+    const section = findSection(
+        course,
+        sectionId
+    );
+
+    const lesson = section.lessons.id(
+        lessonId
+    );
+
+    if (!lesson) {
+        throw new ApiError(
+            404,
+            "Lesson not found."
+        );
+    }
+
+    lesson.deleteOne();
+
+    // Reorder lessons
+    section.lessons.forEach(
+        (lesson, index) => {
+            lesson.order = index + 1;
+        }
+    );
+
+    await course.save();
+};
 export {
     getCourseService,
+    getPublishedCourseService,
     getCourseByIdService,
+    getPublishedCourseByIdService,
+    getCoursesByTeacherService,
     createCourseService,
     updateCourseService,
+    deleteCourseService,
+    changeCourseStatusService,
+
     createSectionService,
-    createLessonService
+    updateSectionService,
+    deleteSectionService,
+    
+    getLessonService,
+    createLessonService,
+    updateLessonService,
+    deleteLessonService
 }
