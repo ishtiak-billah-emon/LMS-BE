@@ -16,12 +16,16 @@ const router = Router();
 // ---------- Public Routes ----------
 
 router.post("/register", registerUser);
-router.post("/login", loginUser);
+router.route("/login").post(loginUser)
 router.post("/refresh-token", refreshAccessToken);
 
 
 // ---------- Protected Routes ----------
-
+router.use((req, res, next) => {
+    console.log("ROUTER:", req.method, req.originalUrl);
+    next();
+  });
+  
 router.use(verifyJWT);
 
 router.post("/logout", logoutUser);
