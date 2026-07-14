@@ -17,9 +17,9 @@ const enrollmentSchema = new Schema(
     },
 
     payment: {
-      type: Schema.Types.ObjectId,
+      type: mongoose.Schema.Types.ObjectId,
       ref: "Payment",
-      required: true,
+      default: null,
     },
 
     progress: {
@@ -45,6 +45,10 @@ const enrollmentSchema = new Schema(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    totalAmount: {
+      type: Number,
+      default: 0,
     },
   },
   {
