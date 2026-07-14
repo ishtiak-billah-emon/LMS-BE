@@ -10,17 +10,29 @@ import {
     deleteSection,
     getCourse,
     changeCourseStatus,
+    changeCourseFeatured,
     getCourseById,
     updateCourse,
     getMyCourses,
     getCoursesByTeacher,
     getPublishedCourse,
     getPublishedCourseById,
-    deleteCourse
+    getFeaturedCourse,
+    deleteCourse,
+    markLessonComplete,
+    getResources,
+    getResourceById,
+    createResource,
+    updateResource,
+    deleteResource,
+    getEnrollmentRequests,
+    createEnrollmentRequest,
+    updateEnrollmentRequest
 } from "../controllers/course.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { authorizeRoles } from "../middlewares/role.middleware.js";
+import { optionalVerifyJWT } from "../middlewares/optionalAuth.middleware.js";
 
 const router = Router();
 
@@ -31,19 +43,46 @@ const uploadCourseThumbnail = upload.fields([
     },
 ]);
 
+
+// enrollment req
+router.get(
+  "/enrollment-requests",
+  verifyJWT,
+  authorizeRoles("admin", "teacher"),
+  getEnrollmentRequests
+);
+
+router.post(
+  "/create-enrollment-request",
+  verifyJWT,
+  createEnrollmentRequest
+);
+
+router.patch(
+  "/enrollment-requests/:id",
+  verifyJWT,
+  authorizeRoles("admin", "teacher"),
+  updateEnrollmentRequest
+);
 // public route 
 
 router.get(
     "/",
     getPublishedCourse
 )
+
 router.get(
     "/unpublished",
     getCourse
 )
+router.get(
+    "/featured",
+    getFeaturedCourse
+)
 
 router.get(
-    "/:courseId",
+    "/:slug",
+    optionalVerifyJWT,
     getPublishedCourseById
 )
 
@@ -64,7 +103,7 @@ router.get(
 router.get(
     "/teacher/:teacherId",
     verifyJWT,
-    authorizeRoles("owner", "admin"),
+    authorizeRoles("teacher", "owner", "admin"),
     getCoursesByTeacher
 );
 
@@ -85,10 +124,17 @@ router.patch(
 );
 
 router.patch(
-    "/:courseId/status",
+  "/:courseId/status",
+  verifyJWT,
+  authorizeRoles("teacher"),
+  changeCourseStatus
+);
+
+router.patch(
+    "/:courseId/featured",
     verifyJWT,
     authorizeRoles("teacher"),
-    changeCourseStatus
+    changeCourseFeatured
 );
 
 router.delete(
@@ -123,10 +169,15 @@ router.delete(
 
 // lesson
 
+// router.get(
+//     "/:courseId/sections/:sectionId/lessons/:lessonId",
+//     verifyJWT,
+//     authorizeRoles("teacher"),
+//     getLesson
+// );
 router.get(
-    "/:courseId/sections/:sectionId/lessons/:lessonId",
+    "/:courseSlug/:lessonSlug",
     verifyJWT,
-    authorizeRoles("teacher"),
     getLesson
 );
 
@@ -150,4 +201,44 @@ router.delete(
     authorizeRoles("teacher"),
     deleteLesson
 );
+
+// resources (nested under lesson)
+
+router.get(
+    "/:courseId/sections/:sectionId/lessons/:lessonId/resources",
+    verifyJWT,
+    authorizeRoles("teacher"),
+    getResources
+);
+
+router.get(
+    "/:courseId/sections/:sectionId/lessons/:lessonId/resources/:resourceId",
+    verifyJWT,
+    authorizeRoles("teacher"),
+    getResourceById
+);
+
+router.post(
+    "/:courseId/sections/:sectionId/lessons/:lessonId/resources",
+    verifyJWT,
+    authorizeRoles("teacher"),
+    createResource
+);
+
+router.patch(
+    "/:courseId/sections/:sectionId/lessons/:lessonId/resources/:resourceId",
+    verifyJWT,
+    authorizeRoles("teacher"),
+    updateResource
+);
+
+router.delete(
+    "/:courseId/sections/:sectionId/lessons/:lessonId/resources/:resourceId",
+    verifyJWT,
+    authorizeRoles("teacher"),
+    deleteResource
+);
+
+
+router.post("/:courseSlug/:lessonSlug/complete", verifyJWT, markLessonComplete);
 export default router;
