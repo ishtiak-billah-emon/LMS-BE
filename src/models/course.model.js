@@ -1,22 +1,21 @@
 import mongoose, { Schema } from "mongoose";
 
-
 const resourceSchema = new Schema(
   {
-      title: {
-          type: String,
-          required: true,
-          trim: true,
-      },
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+    },
 
-      fileUrl: {
-          type: String,
-          required: true,
-          trim: true,
-      },
+    fileUrl: {
+      type: String,
+      required: true,
+      trim: true,
+    },
   },
   {
-      _id: true,
+    _id: true,
   }
 );
 
@@ -25,6 +24,13 @@ const lessonSchema = new Schema(
     title: {
       type: String,
       required: true,
+      trim: true,
+    },
+
+    slug: {
+      type: String,
+      required: true,
+      lowercase: true,
       trim: true,
     },
 
@@ -49,7 +55,7 @@ const lessonSchema = new Schema(
       required: true,
     },
 
-    resources: [resourceSchema]
+    resources: [resourceSchema],
   },
   {
     _id: true,
@@ -133,8 +139,8 @@ const courseSchema = new Schema(
         validator(value) {
           return value <= this.price;
         },
-        message: "Discount price cannot exceed original price."
-      }
+        message: "Discount price cannot exceed original price.",
+      },
     },
 
     totalDuration: {
