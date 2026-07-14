@@ -6,6 +6,9 @@ import {
   loginUserService,
   registerUserService,
   updateProfileService,
+  getMyCoursesService,
+  getStudentService,
+  getStudentByIdService,
 } from "../services/user.service.js";
 import { User } from "../models/user.model.js";
 
@@ -264,6 +267,32 @@ const updateProfile = AsyncHandler(async (req, res) => {
     );
 });
 
+const getMyCourses = AsyncHandler(async (req, res) => {
+  const courses = await getMyCoursesService(req.user);
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, courses, "Courses fetched successfully"));
+});
+
+const getStudents = AsyncHandler(async (req, res) => {
+  const users = await getStudentService();
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, users, "Users fetched successfully"));
+});
+
+const getStudentById = AsyncHandler(async (req, res) => {
+  const { studentId } = req.params;
+
+  const student = await getStudentByIdService(studentId);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, student, "Student fetched successfully"));
+});
+
 export {
   registerUser,
   loginUser,
@@ -272,4 +301,7 @@ export {
   changeCurrentPassword,
   getCurrentUser,
   updateProfile,
+  getMyCourses,
+  getStudents,
+  getStudentById,
 };
