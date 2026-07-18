@@ -96,6 +96,7 @@ const updateProfileService = async (currentUser, updateData) => {
     location,
     bio,
     socialLinks,
+    avatar,
   } = updateData;
 
   // -------------------------------
@@ -146,6 +147,7 @@ const updateProfileService = async (currentUser, updateData) => {
     institutionName,
     location,
     bio,
+    avatar,
   };
 
   Object.entries(fields).forEach(([key, value]) => {
@@ -254,6 +256,22 @@ const getStudentByIdService = async (studentId) => {
   return student;
 };
 
+const setDailyGoalService = async (currentUser, dailyLessonGoal) => {
+  const goal = Number(dailyLessonGoal);
+
+  if (!Number.isInteger(goal) || goal < 1) {
+    throw new ApiError(400, "Daily goal must be a positive whole number");
+  }
+
+  const user = await User.findByIdAndUpdate(
+    currentUser._id,
+    { $set: { dailyLessonGoal: goal } },
+    { new: true, runValidators: true }
+  ).select("-password -refreshToken");
+
+  return user;
+};
+
 export {
   registerUserService,
   loginUserService,
@@ -261,4 +279,5 @@ export {
   getMyCoursesService,
   getStudentService,
   getStudentByIdService,
+  setDailyGoalService,
 };

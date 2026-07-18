@@ -135,7 +135,7 @@ const getFeaturedCourseService = async (page = 1, limit = 12) => {
   const [courses, totalCourses] = await Promise.all([
     Course.find({ isFeatured: true })
       .select(
-        "title slug description thumbnail teacher category price discountPrice rating totalStudents"
+        "title slug description thumbnail teacher category price discountPrice rating totalStudents sections"
       )
       .populate("teacher", "fullName avatar")
       .sort({ createdAt: -1 })
@@ -353,6 +353,20 @@ const updateCourseService = async (
   }
 
   // -------------------------
+  // Featured
+  // -------------------------
+
+  if (courseData.isFeatured !== undefined) {
+    const featured =
+      courseData.isFeatured === true || courseData.isFeatured === "true";
+
+    if (course.isFeatured !== featured) {
+      course.isFeatured = featured;
+      isUpdated = true;
+    }
+  }
+
+  // -------------------------
   // Nothing Changed
   // -------------------------
 
@@ -427,8 +441,13 @@ const changeCourseFeatureService = async (
   courseId,
   isFeatured
 ) => {
-  // Ensure boolean value
-  if (typeof isFeatured !== "boolean") {
+  // Accept boolean or the string representations "true"/"false"
+  let featured;
+  if (typeof isFeatured === "boolean") {
+    featured = isFeatured;
+  } else if (isFeatured === "true" || isFeatured === "false") {
+    featured = isFeatured === "true";
+  } else {
     throw new ApiError(400, "isFeatured must be true or false.");
   }
 
@@ -436,7 +455,7 @@ const changeCourseFeatureService = async (
   const course = await findOwnedCourse(courseId, currentUser);
 
   // Only published courses can be featured
-  if (isFeatured && course.status !== "published") {
+  if (featured && course.status !== "published") {
     throw new ApiError(
       400,
       "Only published courses can be marked as featured."
@@ -444,14 +463,14 @@ const changeCourseFeatureService = async (
   }
 
   // Already in same state
-  if (course.isFeatured === isFeatured) {
+  if (course.isFeatured === featured) {
     throw new ApiError(
       400,
-      `Course is already ${isFeatured ? "featured" : "not featured"}.`
+      `Course is already ${featured ? "featured" : "not featured"}.`
     );
   }
 
-  course.isFeatured = isFeatured;
+  course.isFeatured = featured;
 
   await course.save();
 
@@ -669,7 +688,9 @@ const getLessonService = async (currentUser, courseSlug, lessonSlug) => {
 
   const completed = isEnrolled
     ? enrollment.completedLessons.some(
-        (id) => id.toString() === lesson._id.toString()
+        (c) =>
+          (c.lesson ? c.lesson.toString() : c.toString()) ===
+          lesson._id.toString()
       )
     : false;
 
@@ -815,7 +836,10 @@ const markLessonCompleteService = async (
   );
 
   if (!alreadyCompleted) {
-    enrollment.completedLessons.push(lesson._id);
+    enrollment.completedLessons.push({
+      lesson: lesson._id,
+      completedAt: new Date(),
+    });
   }
 
   const totalLessons = course.sections.reduce(
