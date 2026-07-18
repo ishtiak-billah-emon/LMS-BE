@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
+import { forgotPasswordRateLimiter } from "../middlewares/rateLimiter.middleware.js";
+import { upload } from "../middlewares/multer.middleware.js";
 import {
   registerUser,
   loginUser,
@@ -7,6 +9,11 @@ import {
   refreshAccessToken,
   getCurrentUser,
   changeCurrentPassword,
+  forgotPassword,
+  resetPassword,
+  setDailyGoal,
+  getTodayActivity,
+  getLearningHistory,
   updateProfile,
   getMyCourses,
   getStudents,
@@ -21,6 +28,14 @@ router.post("/register", registerUser);
 router.route("/login").post(loginUser);
 router.post("/refresh-token", refreshAccessToken);
 
+// Password reset (public, rate-limited)
+router.post(
+  "/forgot-password",
+  forgotPasswordRateLimiter,
+  forgotPassword
+);
+router.post("/reset-password/:token", resetPassword);
+
 // ---------- Protected Routes ----------
 
 router.use(verifyJWT);
@@ -29,9 +44,19 @@ router.post("/logout", logoutUser);
 
 router.get("/current-user", getCurrentUser);
 
-router.patch("/update-profile", updateProfile);
+router.patch(
+  "/update-profile",
+  upload.single("avatar"),
+  updateProfile
+);
 
 router.patch("/change-password", changeCurrentPassword);
+
+router.patch("/daily-goal", setDailyGoal);
+
+router.get("/today-activity", getTodayActivity);
+
+router.get("/learning-history", getLearningHistory);
 
 router.get("/my-courses", getMyCourses);
 
