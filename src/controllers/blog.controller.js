@@ -2,6 +2,20 @@ import { AsyncHandler } from "../utils/AsyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { Blog } from "../models/blog.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import {
+  bumpCacheVersion,
+  deleteCache,
+  getCachedJson,
+  getCacheVersion,
+  setCachedJson,
+} from "../utils/cache.js";
+
+const invalidateBlogCache = async (slugs = []) => {
+  await Promise.all([
+    deleteCache(slugs.map((slug) => `lms:blog:public:${slug}`)),
+    bumpCacheVersion("blog-catalog"),
+  ]);
+};
 
 const generateSlug = (title) => {
   return title
@@ -53,35 +67,58 @@ export const getAllBlogs = AsyncHandler(async (req, res) => {
 
   const skip = (Number(page) - 1) * Number(limit);
 
+  const canCache = !search;
+  const version = canCache ? await getCacheVersion("blog-catalog") : null;
+  const cacheKey = canCache
+    ? `lms:blog:catalog:v${version}:page:${page}:limit:${limit}:tag:${encodeURIComponent(tag || "")}:featured:${featured || ""}`
+    : null;
+  const cached = cacheKey ? await getCachedJson(cacheKey) : null;
+  if (cached) {
+    return res.status(200).json(
+      new ApiResponse(200, cached, "Blogs fetched successfully.")
+    );
+  }
+
   const blogs = await Blog.find(filter)
     .populate("author", "fullName")
     .sort({ publishedAt: -1, createdAt: -1 })
     .skip(skip)
-    .limit(Number(limit));
+    .limit(Number(limit))
+    .lean();
 
   const total = await Blog.countDocuments(filter);
 
-  return res.status(200).json(
-    new ApiResponse(200, {
-      blogs,
-      total,
-      page: Number(page),
-      totalPages: Math.ceil(total / Number(limit)),
-    }, "Blogs fetched successfully.")
-  );
+  const result = {
+    blogs,
+    total,
+    page: Number(page),
+    totalPages: Math.ceil(total / Number(limit)),
+  };
+  if (cacheKey) await setCachedJson(cacheKey, result, 300);
+  return res.status(200).json(new ApiResponse(200, result, "Blogs fetched successfully."));
 });
 
 export const getBlogBySlug = AsyncHandler(async (req, res) => {
   const { slug } = req.params;
+  const cacheKey = `lms:blog:public:${slug}`;
+  const cached = await getCachedJson(cacheKey);
+  if (cached) {
+    return res.status(200).json(
+      new ApiResponse(200, cached, "Blog fetched successfully.")
+    );
+  }
 
   const blog = await Blog.findOne({ slug, status: "published" })
-    .populate("author", "fullName email");
+    .populate("author", "fullName email")
+    .lean();
 
   if (!blog) {
     return res.status(404).json(
       new ApiResponse(404, null, "Blog not found")
     );
   }
+
+  await setCachedJson(cacheKey, blog, 600);
 
   return res.status(200).json(
     new ApiResponse(200, blog, "Blog fetched successfully.")
@@ -131,6 +168,7 @@ export const createBlog = AsyncHandler(async (req, res) => {
     "author",
     "fullName email"
   );
+  await invalidateBlogCache([blog.slug]);
 
   return res
     .status(201)
@@ -142,6 +180,7 @@ export const updateBlog = AsyncHandler(async (req, res) => {
   const { title, content, excerpt, thumbnail, tags, status } = req.body;
 
   const blog = await Blog.findById(blogId);
+  const oldSlug = blog?.slug;
 
   if (!blog) {
     return res.status(404).json(
@@ -190,6 +229,7 @@ export const updateBlog = AsyncHandler(async (req, res) => {
   }
 
   await blog.save();
+  await invalidateBlogCache([oldSlug, blog.slug]);
 
   const updatedBlog = await Blog.findById(blog._id).populate(
     "author",
@@ -219,6 +259,7 @@ export const deleteBlog = AsyncHandler(async (req, res) => {
   }
 
   await Blog.findByIdAndDelete(blogId);
+  await invalidateBlogCache([blog.slug]);
 
   return res.status(200).json(
     new ApiResponse(200, null, "Blog deleted successfully.")
@@ -287,6 +328,7 @@ export const toggleBlogFeatured = AsyncHandler(async (req, res) => {
 
   blog.isFeatured = !blog.isFeatured;
   await blog.save();
+  await invalidateBlogCache([blog.slug]);
 
   return res.status(200).json(
     new ApiResponse(200, blog, `Blog ${blog.isFeatured ? "featured" : "unfeatured"} successfully.`)

@@ -28,6 +28,7 @@ import {
   deleteResourceService,
 } from "../services/course.service.js";
 import enrollmentRequestModel from "../models/enrollmentRequest.model.js";
+import { Enrollment } from "../models/enrollment.model.js";
 
 const createCourse = AsyncHandler(async (req, res) => {
   const { title, description, category, price, discountPrice } = req.body;
@@ -183,8 +184,8 @@ const changeCourseFeatured = AsyncHandler(async (req, res) => {
   const { courseId } = req.params;
   const { isFeatured } = req.body;
 
-  if (!isFeatured) {
-    throw new ApiError(400, "Feature or not is required.");
+  if (isFeatured === undefined || isFeatured === null || isFeatured === "") {
+    throw new ApiError(400, "isFeatured is required.");
   }
 
   const course = await changeCourseFeatureService(
@@ -196,7 +197,11 @@ const changeCourseFeatured = AsyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(
-      new ApiResponse(200, course, `Course ${isFeatured} changed successfully.`)
+      new ApiResponse(
+        200,
+        course,
+        `Course ${course.isFeatured ? "marked as featured" : "unfeatured"} successfully.`
+      )
     );
 });
 
@@ -503,18 +508,16 @@ export const updateEnrollmentRequest = async (req, res) => {
   }
 
   if (status === "approved") {
-    const exists = await enrollmentRequestModel.findOne({
+    const existingEnrollment = await Enrollment.findOne({
       student: request.student,
       course: request.course,
     });
 
-    if (!exists) {
-      await enrollmentRequestModel.create({
+    if (!existingEnrollment) {
+      await Enrollment.create({
         student: request.student,
         course: request.course,
         totalAmount: request.amount,
-        paymentMethod: request.paymentMethod,
-        paymentStatus: "completed",
       });
     }
 

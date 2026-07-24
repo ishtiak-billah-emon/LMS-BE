@@ -1,5 +1,6 @@
 import mongoose, { Schema } from "mongoose";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { DB_NAME } from "../constants.js";
 
@@ -105,6 +106,12 @@ const userSchema = new Schema(
             default: false
         },
 
+        dailyLessonGoal: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+
         socialLinks: {
             facebook: {
                 type: String,
@@ -134,6 +141,16 @@ const userSchema = new Schema(
 
         refreshToken: {
             type: String,
+        },
+
+        passwordResetToken: {
+            type: String,
+            default: undefined,
+        },
+
+        passwordResetExpires: {
+            type: Date,
+            default: undefined,
         },
     },
     {
@@ -177,6 +194,27 @@ userSchema.methods.generateRefreshToken = function () {
             expiresIn: process.env.REFRESH_TOKEN_EXPIRY,
         }
     );
+};
+
+// Generates a cryptographically secure reset token, stores only its SHA-256
+// hash (never the plain token) and sets a 15-minute expiry. Returns the plain
+// token to be embedded in the reset URL.
+userSchema.methods.generatePasswordResetToken = function () {
+    const resetToken = crypto.randomBytes(32).toString("hex");
+
+    this.passwordResetToken = crypto
+        .createHash("sha256")
+        .update(resetToken)
+        .digest("hex");
+
+    this.passwordResetExpires = Date.now() + 15 * 60 * 1000;
+
+    return resetToken;
+};
+
+userSchema.methods.clearPasswordResetToken = function () {
+    this.passwordResetToken = undefined;
+    this.passwordResetExpires = undefined;
 };
 
 

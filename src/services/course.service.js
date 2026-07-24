@@ -9,6 +9,21 @@ import { findOwnedCourse } from "../utils/course.helper.js";
 import { findSection } from "../utils/section.helper.js";
 import mongoose from "mongoose";
 import { Enrollment } from "../models/enrollment.model.js"; // adjust path
+import {
+  bumpCacheVersion,
+  deleteCache,
+  getCachedJson,
+  getCacheVersion,
+  setCachedJson,
+} from "../utils/cache.js";
+
+const invalidateCourseCache = async ({ slugs = [] } = {}) => {
+  await Promise.all([
+    deleteCache(slugs.map((slug) => `lms:course:public:${slug}`)),
+    bumpCacheVersion("course-catalog"),
+    bumpCacheVersion("featured-course-catalog"),
+  ]);
+};
 
 // main course
 
@@ -71,10 +86,16 @@ const createCourseService = async (
     discountPrice: Number(discountPrice) || 0,
   });
 
+  await invalidateCourseCache();
+
   return course;
 };
 
 const getPublishedCourseService = async (page = 1, limit = 12) => {
+  const version = await getCacheVersion("course-catalog");
+  const cacheKey = `lms:course:catalog:v${version}:page:${page}:limit:${limit}`;
+  const cached = await getCachedJson(cacheKey);
+  if (cached) return cached;
   const skip = (page - 1) * limit;
 
   const [courses, totalCourses] = await Promise.all([
@@ -87,12 +108,13 @@ const getPublishedCourseService = async (page = 1, limit = 12) => {
       .populate("teacher", "fullName avatar")
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit),
+      .limit(limit)
+      .lean(),
 
     Course.countDocuments({ status: "published" }),
   ]);
 
-  return {
+  const result = {
     courses,
     pagination: {
       page,
@@ -101,6 +123,8 @@ const getPublishedCourseService = async (page = 1, limit = 12) => {
       totalPages: Math.ceil(totalCourses / limit),
     },
   };
+  await setCachedJson(cacheKey, result, 300);
+  return result;
 };
 
 const getCourseService = async (page = 1, limit = 12) => {
@@ -130,6 +154,10 @@ const getCourseService = async (page = 1, limit = 12) => {
   };
 };
 const getFeaturedCourseService = async (page = 1, limit = 12) => {
+  const version = await getCacheVersion("featured-course-catalog");
+  const cacheKey = `lms:course:featured:v${version}:page:${page}:limit:${limit}`;
+  const cached = await getCachedJson(cacheKey);
+  if (cached) return cached;
   const skip = (page - 1) * limit;
 
   const [courses, totalCourses] = await Promise.all([
@@ -140,12 +168,13 @@ const getFeaturedCourseService = async (page = 1, limit = 12) => {
       .populate("teacher", "fullName avatar")
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit),
+      .limit(limit)
+      .lean(),
 
     Course.countDocuments({}),
   ]);
 
-  return {
+  const result = {
     courses,
     pagination: {
       page,
@@ -154,15 +183,24 @@ const getFeaturedCourseService = async (page = 1, limit = 12) => {
       totalPages: Math.ceil(totalCourses / limit),
     },
   };
+  await setCachedJson(cacheKey, result, 300);
+  return result;
 };
 
 const getPublishedCourseByIdService = async (currentUser, slug) => {
-  const course = await Course.findOne({
-    slug,
-    status: "published",
-  })
-    .populate("teacher", "fullName avatar bio")
-    .lean();
+  const cacheKey = `lms:course:public:${slug}`;
+  let course = await getCachedJson(cacheKey);
+
+  if (!course) {
+    course = await Course.findOne({
+      slug,
+      status: "published",
+    })
+      .populate("teacher", "fullName avatar bio")
+      .lean();
+
+    if (course) await setCachedJson(cacheKey, course, 600);
+  }
 
   if (!course) {
     throw new ApiError(404, "Course not found");
@@ -251,6 +289,7 @@ const updateCourseService = async (
   thumbnailLocalPath
 ) => {
   const course = await findOwnedCourse(courseId, currentUser);
+  const oldSlug = course.slug;
 
   let isUpdated = false;
 
@@ -375,17 +414,20 @@ const updateCourseService = async (
   }
 
   await course.save();
+  await invalidateCourseCache({ slugs: [oldSlug, course.slug] });
 
   return course;
 };
 
 const deleteCourseService = async (currentUser, courseId) => {
   const course = await findOwnedCourse(courseId, currentUser);
+  const slug = course.slug;
 
   if (course.thumbnail) {
     await deleteFromCloudinary(course.thumbnail);
   }
   await course.deleteOne();
+  await invalidateCourseCache({ slugs: [slug] });
 
   return;
 };
@@ -432,6 +474,7 @@ const changeCourseStatusService = async (currentUser, courseId, status) => {
   course.status = status;
 
   await course.save();
+  await invalidateCourseCache({ slugs: [course.slug] });
 
   return course;
 };
@@ -473,6 +516,7 @@ const changeCourseFeatureService = async (
   course.isFeatured = featured;
 
   await course.save();
+  await invalidateCourseCache({ slugs: [course.slug] });
 
   return course;
 };
@@ -506,6 +550,7 @@ const createSectionService = async (currentUser, courseId, title) => {
 
   // await course.save({validateBeforeSave:false})
   await course.save();
+  await invalidateCourseCache({ slugs: [course.slug] });
 
   return course;
 };
@@ -538,6 +583,7 @@ const updateSectionService = async (
   section.title = title.trim();
 
   await course.save();
+  await invalidateCourseCache({ slugs: [course.slug] });
 
   return section;
 };
@@ -554,6 +600,7 @@ const deleteSectionService = async (currentUser, courseId, sectionId) => {
   });
 
   await course.save();
+  await invalidateCourseCache({ slugs: [course.slug] });
 };
 const createLessonService = async (
   currentUser,
@@ -617,6 +664,7 @@ const createLessonService = async (
   // ----------------------------------
 
   await course.save();
+  await invalidateCourseCache({ slugs: [course.slug] });
 
   // ----------------------------------
   // Return Newly Created Lesson
@@ -763,6 +811,7 @@ const updateLessonService = async (
   }
 
   await course.save();
+  await invalidateCourseCache({ slugs: [course.slug] });
 
   return lesson;
 };
@@ -791,6 +840,7 @@ const deleteLessonService = async (
   });
 
   await course.save();
+  await invalidateCourseCache({ slugs: [course.slug] });
 };
 
 const markLessonCompleteService = async (
@@ -936,6 +986,7 @@ const createResourceService = async (
   });
 
   await course.save();
+  await invalidateCourseCache({ slugs: [course.slug] });
 
   return lesson.resources.at(-1);
 };
@@ -987,6 +1038,7 @@ const updateResourceService = async (
   }
 
   await course.save();
+  await invalidateCourseCache({ slugs: [course.slug] });
 
   return resource;
 };
@@ -1017,9 +1069,11 @@ const deleteResourceService = async (
   resource.deleteOne();
 
   await course.save();
+  await invalidateCourseCache({ slugs: [course.slug] });
 };
 
 export {
+  invalidateCourseCache,
   getCourseService,
   getPublishedCourseService,
   getCourseByIdService,

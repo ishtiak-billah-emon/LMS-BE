@@ -31,7 +31,13 @@ const enrollmentSchema = new Schema(
 
     completedLessons: [
       {
-        type: Schema.Types.ObjectId,
+        lesson: {
+          type: Schema.Types.ObjectId,
+        },
+        completedAt: {
+          type: Date,
+          default: Date.now,
+        },
       },
     ],
 
