@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
-import { forgotPasswordRateLimiter } from "../middlewares/rateLimiter.middleware.js";
+import {
+  forgotPasswordRateLimiter,
+  loginRateLimiter,
+} from "../middlewares/rateLimiter.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import {
   registerUser,
@@ -25,7 +28,8 @@ const router = Router();
 // ---------- Public Routes ----------
 
 router.post("/register", registerUser);
-router.route("/login").post(loginUser);
+// Keep password guessing from making unlimited requests to the login handler.
+router.route("/login").post(loginRateLimiter, loginUser);
 router.post("/refresh-token", refreshAccessToken);
 
 // Password reset (public, rate-limited)

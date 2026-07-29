@@ -32,10 +32,10 @@ export const connectRedis = async () => {
 
     if (!redisClient.isOpen) await redisClient.connect();
 
-    console.log("Redis connected.");
+    // console.log("Redis connected.");
     return redisClient;
   } catch (error) {
-    console.error("[redis] connection failed; caching is disabled:", error.message);
+    // console.error("[redis] connection failed; caching is disabled:", error.message);
     return null;
   }
 };

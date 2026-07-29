@@ -6,7 +6,7 @@ import { AsyncHandler } from "../utils/AsyncHandler.js";
 import { User } from "../models/user.model.js";
 
 export const verifyJWT = AsyncHandler(async (req, res, next) => {
-  console.log("verifyJWT:", req.method, req.originalUrl);
+  // console.log("verifyJWT:", req.method, req.originalUrl);
   if (req.method === "OPTIONS") {
     return next();
   }

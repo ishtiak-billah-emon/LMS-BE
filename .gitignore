@@ -1,7 +1,9 @@
 
 ### ExpressionEngine ###
 .DS_Store
-
+QA_INTERVIEW_BUG_FIXING_ANSWER.md
+REDIS_GUIDE.md
+LOGIN_RATE_LIMIT.md
 # Images
 images/avatars/
 images/captchas/

@@ -473,7 +473,7 @@ const createEnrollmentRequest = async (req, res) => {
 };
 
 export const getEnrollmentRequests = async (req, res) => {
-  console.log("INSIDE getEnrollmentRequests");
+  // console.log("INSIDE getEnrollmentRequests");
   const requests = await enrollmentRequestModel
     .find()
     .populate("student", "name email")

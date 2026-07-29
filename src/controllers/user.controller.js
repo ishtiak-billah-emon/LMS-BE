@@ -51,10 +51,16 @@ const registerUser = AsyncHandler(async (req, res) => {
 
     // check if user already exists or not 
 
-    const existedUser = await User.findOne({ email });
+    const existedUser = await User.findOne({ email: email.toLowerCase().trim() });
 
     if (existedUser) {
         throw new ApiError(409, "User already exists")
+    }
+
+    const existedPhone = await User.findOne({ phone: phone.trim() });
+
+    if (existedPhone) {
+        throw new ApiError(409, "This phone number is already registered. Please use a different number or log in.");
     }
 
     // create user object

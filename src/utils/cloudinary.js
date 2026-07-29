@@ -49,7 +49,7 @@ const deleteFromCloudinary = async (imageUrl) => {
       await cloudinary.uploader.destroy(publicId);
     }
   } catch (error) {
-    console.log("Cloudinary delete error:", error);
+    // console.log("Cloudinary delete error:", error);
   }
 };
 
