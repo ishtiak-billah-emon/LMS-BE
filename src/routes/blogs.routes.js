@@ -8,6 +8,7 @@ import {
   getTeacherBlogs,
   getBlogById,
   toggleBlogFeatured,
+  uploadBlogImage,
 } from "../controllers/blog.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { authorizeRoles } from "../middlewares/role.middleware.js";
@@ -28,6 +29,14 @@ router.get("/slug/:slug", getBlogBySlug);
 
 // Teacher routes
 router.get("/teacher/my-blogs", verifyJWT, authorizeRoles("teacher"), getTeacherBlogs);
+
+router.post(
+  "/upload-image",
+  verifyJWT,
+  authorizeRoles("teacher"),
+  upload.single("image"),
+  uploadBlogImage
+);
 
 router.post(
   "/create",

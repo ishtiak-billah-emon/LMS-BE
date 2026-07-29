@@ -9,11 +9,11 @@ import { closeRedis, connectRedis } from "./config/redis.js";
 connectDB()
 .then(() => {
   app.on("error", (error)=>{
-    // console.log("Error at server: ", error);
+    console.log("Error at server: ", error);
     throw error
   })
   app.listen(process.env.PORT || 8000, ()=>{
-    // console.log(`Server is running at port: ${process.env.PORT}`);
+    console.log(`Server is running at port: ${process.env.PORT}`);
   })
 
   // Redis is an optional cache. Never block API availability on it.

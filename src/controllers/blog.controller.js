@@ -175,6 +175,21 @@ export const createBlog = AsyncHandler(async (req, res) => {
     .json(new ApiResponse(201, populatedBlog, "Blog created successfully."));
 });
 
+export const uploadBlogImage = AsyncHandler(async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json(new ApiResponse(400, null, "An image file is required"));
+  }
+
+  const uploadedImage = await uploadOnCloudinary(req.file.path);
+  if (!uploadedImage?.secure_url) {
+    return res.status(500).json(new ApiResponse(500, null, "Failed to upload blog image"));
+  }
+
+  return res.status(201).json(
+    new ApiResponse(201, { url: uploadedImage.secure_url }, "Blog image uploaded successfully.")
+  );
+});
+
 export const updateBlog = AsyncHandler(async (req, res) => {
   const { blogId } = req.params;
   const { title, content, excerpt, thumbnail, tags, status } = req.body;
