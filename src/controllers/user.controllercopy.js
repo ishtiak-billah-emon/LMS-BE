@@ -56,49 +56,16 @@ const loginUser = AsyncHandler(async (req, res) => {
     throw new ApiError(400, "Password is required");
   }
 
-  /* const user = await User.findOne({
-        email: email.toLowerCase().trim(),
-    });
-
-    if (!user) {
-        throw new ApiError(404, "User does not exist");
-    }
-
-    const isPasswordValid =
-        await user.isPasswordCorrect(password);
-
-    if (!isPasswordValid) {
-        throw new ApiError(
-            401,
-            "Invalid user credentials"
-        );
-    }
-
-    const { accessToken, refreshToken } =
-        await generateAccessAndRefreshTokens(
-            user._id
-        );
-
-    const loggedInUser = await User.findById(
-        user._id
-    ).select("-password -refreshToken");
-
-    const options = {
-        httpOnly: true,
-        // secure:
-        //     process.env.NODE_ENV === "production",
-        secure: false,
-    }; */
-
   const { accessToken, refreshToken, loggedInUser } = await loginUserService(
     req.body
   );
 
+  const isProduction = process.env.NODE_ENV === "production";
+
   const options = {
     httpOnly: true,
-    // secure:
-    //     process.env.NODE_ENV === "production",
-    secure: false,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
   };
 
   return res
